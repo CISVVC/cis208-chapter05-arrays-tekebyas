@@ -12,10 +12,10 @@ segment .data
         SUCCESS: equ 0
         kernelcall: equ 80h
 
-        arr     db  1,2,3,4,5           ; declares an array with 5 positions containing
+        arr     dd  1,2,3,4,5           ; declares an array with 5 positions containing
                                         ; the range 1 to 5
-        size    db  5
-        scalar  db  4
+        size    dd  5
+        scalar  dd  4
 
 
 
@@ -33,27 +33,38 @@ asm_main:
         pusha
 ; *********** Start  Assignment Code *******************
 
-        xor     eax, eax
-        mov     eax, arr            ; moves the address of the first position 
-                                    ; of the array to eax
-        xor     ebx, ebx
-        mov     ebx, 5              ; move the size of the array to ebx
-
-        xor     ecx, ecx
-        mov     ecx, 4              ; ecx holds scalar
-
+        mov     eax, arr
         push    eax
-        push    ebx
-        push    ecx
+        mov     eax, [size]
+        push    eax
 
-        call    scale
+        call    print_arr
+        call    print_nl
+
+        add     esp, 8
+
+
+        mov     eax, arr
+        push    eax
+        mov     eax, [size]
+        push    eax
+        mov     eax, [scalar]
+        push    eax
+
+        call    scale               ; call function
 
         add     esp, 12             ; clear used data off of stack
 
-        mov     eax, [arr]
-        call    print_int
+
+        mov     eax, arr
+        push    eax
+        mov     eax, [size]
+        push    eax
+
+        call    print_arr
         call    print_nl
 
+        add     esp, 8
 
 ; *********** End Assignment Code **********************
 
@@ -62,23 +73,58 @@ asm_main:
         leave                     
         ret
 
+;   Prints the contents of an array with a space 
+;   between each index
+;   Takes two parameters:
+;       *arr - the address of the array start position ( ebp + 12 )
+;       n    - the size of the array                   ( ebp + 8 )
+
+print_arr:
+        push    ebp
+        mov     ebp, esp
+
+        mov     ecx, [ebp+8]        ; ecx = n
+        mov     ebx, [ebp+12]       ; ebx = &arr
+        xor     edx, edx            ; counter
+
+        print_loop:
+            mov     eax, [ebx + 4*edx]
+            call    print_int
+            mov     eax, 0x20       ; ASCII code for space ' '
+            call    print_char
+
+            inc     edx
+            loop    print_loop
+
+        pop     ebp
+        ret
+
+
+;   Scales the contents of each index of an array
+;   Takes three parameters:
+;       *arr   - the address of the array   ( ebp + 16 )
+;       n      - the size of the array      ( ebp + 12 )
+;       scalar - the number to scale by     ( ebp + 8 )
 
 scale:
         push    ebp
         mov     ebp, esp
 
-        mov     ecx, [ebp+12]               ; stores size in ecx for loop
-        mov     ebx, [ebp+8]                ; stores scalar in ebx
-        mov     esi, [ebp+16]               ; store first positon of array in esi
-                                            ; what is stored in eax is the address of the array
-                                            ; as opposed to moving the entire array
+        mov     ebx, [ebp + 16]     ; arr start
+        mov     ecx, [ebp + 12]     ; arr size
+        mov     edx, [ebp + 8]      ; scalar
+        
+        lp:
+            push    edx             ; store scalar so that it is not lost
+                                    ; with mul
+            ; -4 needed to zero index the array, ( i.e. size() - 1, not size() )
+            mov     eax, [ebx - 4 + 4*ecx]
+            mul     edx
 
-        loop_start:
-            mov     eax, [esi + ecx]        ; moves the contents of the beginning of the
-                                            ; array offset by what position we are at
-                                            ; into eax for multiplication
-            mul     ebx                     ; multiplies what is in eax by bx
-            loop    loop_start
+            mov     [ebx - 4 + 4*ecx], eax
+
+            pop     edx             ; restore scalar before loop
+            loop    lp
 
         pop     ebp
         ret
